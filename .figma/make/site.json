@@ -1,0 +1,10 @@
+{
+  "description": "Empowering online merchants to boost revenue, this AI-driven platform analyzes transaction and customer data to uncover growth opportunities and optimize campaigns.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

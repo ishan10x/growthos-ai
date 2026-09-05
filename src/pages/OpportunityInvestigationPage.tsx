@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   BarChart,
   Bar,
@@ -10,11 +10,16 @@ import {
 } from "recharts"
 import type { Page } from "../types"
 import type { CrossSellOpportunity } from "../types/dataFoundation"
+import type {
+  OpportunityExplanation,
+  CampaignRecommendation,
+} from "../types/ai"
 import { Icons } from "../components/common/Icons"
 import { Badge } from "../components/common/Badge"
 import { ConfidenceMeter } from "../components/common/ConfidenceMeter"
 import { customerSegmentData } from "../data/mockData"
 import { getPrimaryOpportunity } from "../services/opportunityService"
+import { aiService } from "../services/aiService"
 
 export interface OpportunityInvestigationPageProps {
   onNav: (p: Page) => void
@@ -27,8 +32,26 @@ export function OpportunityInvestigationPage({
 }: OpportunityInvestigationPageProps) {
   const [actionState, setActionState] =
     useState<"idle" | "approved" | "rejected">("idle")
+  const [explanation, setExplanation] = useState<OpportunityExplanation | null>(
+    null,
+  )
+  const [recommendation, setRecommendation] =
+    useState<CampaignRecommendation | null>(null)
 
   const opp = opportunity ?? getPrimaryOpportunity()
+
+  useEffect(() => {
+    let isMounted = true
+    aiService.getOpportunityExplanation(opp).then((exp) => {
+      if (isMounted) setExplanation(exp)
+    })
+    aiService.getCampaignRecommendation(opp).then((rec) => {
+      if (isMounted) setRecommendation(rec)
+    })
+    return () => {
+      isMounted = false
+    }
+  }, [opp])
 
   const dynamicMetrics = [
     { label: "Customers Analyzed", value: "12,840", sub: "Total active base" },
@@ -234,23 +257,29 @@ export function OpportunityInvestigationPage({
             {/* Plain-language AI narrative */}
             <div className="bg-slate-50 border border-slate-200 rounded-xl px-5 py-4 mb-5">
               <p className="text-sm text-slate-700 leading-relaxed">
-                I analyzed{" "}
-                <span className="font-semibold text-slate-900">
-                  18,420 orders
-                </span>{" "}
-                over the last 90 days. Customers who purchased{" "}
-                {opp.sourceProduct.name.toLowerCase()} frequently purchased{" "}
-                {opp.recommendedProduct.name.toLowerCase()} within 14 days. Your
-                current attach rate is{" "}
-                <span className="font-semibold text-slate-900">
-                  {Math.round(opp.attachRate * 100)}%
-                </span>
-                , compared with a{" "}
-                <span className="font-semibold text-slate-900">
-                  {Math.round(opp.benchmarkAttachRate * 100)}% category
-                  benchmark
-                </span>
-                . This indicates a strong cross-sell opportunity.
+                {explanation ? (
+                  explanation.summary
+                ) : (
+                  <>
+                    I analyzed{" "}
+                    <span className="font-semibold text-slate-900">
+                      18,420 orders
+                    </span>{" "}
+                    over the last 90 days. Customers who purchased{" "}
+                    {opp.sourceProduct.name.toLowerCase()} frequently purchased{" "}
+                    {opp.recommendedProduct.name.toLowerCase()} within 14 days.
+                    Your current attach rate is{" "}
+                    <span className="font-semibold text-slate-900">
+                      {Math.round(opp.attachRate * 100)}%
+                    </span>
+                    , compared with a{" "}
+                    <span className="font-semibold text-slate-900">
+                      {Math.round(opp.benchmarkAttachRate * 100)}% category
+                      benchmark
+                    </span>
+                    . This indicates a strong cross-sell opportunity.
+                  </>
+                )}
               </p>
             </div>
 
@@ -299,6 +328,25 @@ export function OpportunityInvestigationPage({
                 </div>
               ))}
             </div>
+
+            {/* Key Caveats & Risk Factors */}
+            {explanation?.caveats && explanation.caveats.length > 0 && (
+              <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-4 mb-5">
+                <p className="text-[10px] text-amber-800 uppercase tracking-wider font-semibold mb-2">
+                  AI Caveats & Risk Factors Considered
+                </p>
+                <ul className="list-disc list-inside space-y-1">
+                  {explanation.caveats.map((c, idx) => (
+                    <li
+                      key={idx}
+                      className="text-xs text-amber-900/90 leading-relaxed"
+                    >
+                      {c}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* Detailed reasoning panels */}
             <div className="flex flex-col gap-3">
@@ -455,7 +503,7 @@ export function OpportunityInvestigationPage({
                   Recommended Campaign
                 </p>
                 <p className="text-sm font-bold text-slate-900 mb-4">
-                  "Complete Your Run"
+                  "{recommendation?.campaignName ?? "Complete Your Run"}"
                 </p>
 
                 {/* Bundle pricing */}
@@ -489,8 +537,9 @@ export function OpportunityInvestigationPage({
                       <span className="text-base font-bold text-blue-700 mono">
                         ₹
                         {(
+                          recommendation?.suggestedBundlePrice ??
                           opp.sourceProduct.price +
-                          Math.round(opp.recommendedProduct.price * 0.6)
+                            Math.round(opp.recommendedProduct.price * 0.6)
                         ).toLocaleString()}
                       </span>
                     </div>

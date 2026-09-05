@@ -1,8 +1,11 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import type { Page } from "../types"
 import type { CrossSellOpportunity } from "../types/dataFoundation"
+import type { CampaignRecommendation } from "../types/ai"
 import { getPrimaryOpportunity } from "../services/opportunityService"
+import { aiService } from "../services/aiService"
 import { Icons } from "../components/common/Icons"
+import { Badge } from "../components/common/Badge"
 
 export interface CampaignCreatePageProps {
   onNav: (p: Page) => void
@@ -16,8 +19,20 @@ export function CampaignCreatePage({
   const [step, setStep] = useState(1)
   const [channel, setChannel] = useState("email")
   const [launched, setLaunched] = useState(false)
-
   const opp = opportunity ?? getPrimaryOpportunity()
+  const [recommendation, setRecommendation] = useState<CampaignRecommendation>(
+    () => aiService.getCampaignRecommendationSync(opp),
+  )
+
+  useEffect(() => {
+    let isMounted = true
+    aiService.getCampaignRecommendation(opp).then((rec) => {
+      if (isMounted) setRecommendation(rec)
+    })
+    return () => {
+      isMounted = false
+    }
+  }, [opp])
 
   if (launched) {
     return (
@@ -38,7 +53,7 @@ export function CampaignCreatePage({
             Campaign Launched!
           </h2>
           <p className="text-sm text-slate-500 mb-6">
-            "Complete Your Run" is now live.{" "}
+            "{recommendation.campaignName}" is now live.{" "}
             {opp.estimatedEligibleCustomers.toLocaleString()} customers will
             receive the campaign over the next 24 hours.
           </p>
@@ -116,13 +131,116 @@ export function CampaignCreatePage({
             <h2 className="text-base font-semibold text-slate-900 mb-5">
               Campaign Setup
             </h2>
+
+            {/* AI Campaign Recommendation Card */}
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl mb-6">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-blue-600">{Icons.sparkle}</span>
+                  <span className="text-sm font-semibold text-blue-900">
+                    AI Campaign Recommendation
+                  </span>
+                  <Badge variant="blue">AI Suggested</Badge>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs font-medium text-blue-800">
+                  <span className="text-blue-600 font-normal">Confidence:</span>
+                  <span className="font-bold mono bg-blue-100/80 px-2 py-0.5 rounded text-blue-900">
+                    {opp.confidenceScore}%
+                  </span>
+                </div>
+              </div>
+
+              {/* Strategy & Rationale */}
+              <div className="bg-white/90 border border-blue-100 rounded-lg p-3.5 mb-3.5 shadow-xs">
+                <p className="text-[10px] uppercase font-bold tracking-wider text-blue-600 mb-1">
+                  Strategy & Rationale
+                </p>
+                <p className="text-xs text-slate-700 leading-relaxed">
+                  {recommendation.rationale}
+                </p>
+              </div>
+
+              {/* Structured AI Recommendation Details */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs mb-3.5">
+                <div className="bg-white/80 border border-blue-100 rounded-lg p-3">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">
+                    Recommended Offer & Type
+                  </span>
+                  <span className="font-semibold text-slate-900 text-sm">
+                    "{recommendation.campaignName}"
+                  </span>
+                  <span className="inline-block ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-blue-100 text-blue-700">
+                    {recommendation.campaignType}
+                  </span>
+                  <p className="text-xs text-slate-600 mt-1.5">
+                    {recommendation.offerDescription}
+                  </p>
+                </div>
+
+                <div className="bg-white/80 border border-blue-100 rounded-lg p-3">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">
+                    Target Audience & Channels
+                  </span>
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    {recommendation.channels.map((ch) => (
+                      <span
+                        key={ch}
+                        className="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200"
+                      >
+                        {ch}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-xs text-slate-600 line-clamp-2">
+                    {recommendation.targetAudience}
+                  </p>
+                </div>
+              </div>
+
+              {/* Message preview snippet in card */}
+              <div className="bg-white/80 border border-blue-100 rounded-lg p-3 mb-3.5">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider">
+                    Generated Copy Preview
+                  </span>
+                  <span className="text-[10px] text-blue-600 font-medium">
+                    Headline: "{recommendation.headline}"
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 italic">
+                  "{recommendation.body}"
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-blue-200/60 text-xs text-blue-800">
+                <span className="flex items-center gap-2">
+                  <span>Suggested Bundle Price:</span>
+                  <span className="text-sm font-bold text-blue-900 mono">
+                    ₹{recommendation.suggestedBundlePrice.toLocaleString()}
+                  </span>
+                  <span className="text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 text-[11px]">
+                    Save ₹
+                    {(
+                      opp.sourceProduct.price +
+                      opp.recommendedProduct.price -
+                      recommendation.suggestedBundlePrice
+                    ).toLocaleString()}
+                  </span>
+                </span>
+                <span className="text-slate-500 text-[11px] italic">
+                  Pre-filled into campaign fields below
+                </span>
+              </div>
+            </div>
+
             <div className="flex flex-col gap-4">
               <div>
                 <label className="text-xs font-medium text-slate-600 mb-1.5 block">
                   Campaign Name
                 </label>
                 <input
-                  defaultValue='"Complete Your Run"'
+                  key={recommendation.campaignName}
+                  defaultValue={recommendation.campaignName}
                   className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
@@ -130,7 +248,16 @@ export function CampaignCreatePage({
                 <label className="text-xs font-medium text-slate-600 mb-1.5 block">
                   Offer Type
                 </label>
-                <select className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <select
+                  defaultValue={
+                    recommendation.campaignType === "bundle"
+                      ? "Cross-sell Bundle"
+                      : recommendation.campaignType === "upsell"
+                        ? "Upsell"
+                        : "Discount"
+                  }
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
                   <option>Cross-sell Bundle</option>
                   <option>Upsell</option>
                   <option>Discount</option>
@@ -142,7 +269,8 @@ export function CampaignCreatePage({
                     Bundle Price
                   </label>
                   <input
-                    defaultValue="₹2,799"
+                    key={recommendation.suggestedBundlePrice}
+                    defaultValue={`₹${recommendation.suggestedBundlePrice.toLocaleString()}`}
                     className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mono"
                   />
                 </div>
@@ -194,8 +322,12 @@ export function CampaignCreatePage({
                 <span className="text-sm font-semibold text-blue-900">
                   AI-Selected Segment
                 </span>
+                <Badge variant="blue">Target Audience</Badge>
               </div>
-              <p className="text-xs text-blue-700">
+              <p className="text-xs text-blue-800 leading-relaxed font-medium mb-1">
+                {recommendation.targetAudience}
+              </p>
+              <p className="text-xs text-blue-600/80">
                 Customers who purchased {opp.sourceProduct.name.toLowerCase()}{" "}
                 in the last 45 days without purchasing{" "}
                 {opp.recommendedProduct.name.toLowerCase()}, with prior sock
@@ -256,6 +388,37 @@ export function CampaignCreatePage({
             <h2 className="text-base font-semibold text-slate-900 mb-5">
               Message Preview
             </h2>
+
+            {/* AI Copy & Strategy Guidance */}
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl mb-5">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-blue-600">{Icons.sparkle}</span>
+                  <span className="text-sm font-semibold text-blue-900">
+                    AI-Generated Copy & Strategy
+                  </span>
+                </div>
+                <Badge variant="blue">Optimized Copy</Badge>
+              </div>
+              <p className="text-xs text-slate-700 leading-relaxed mb-3">
+                {recommendation.rationale}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-blue-900 pt-2.5 border-t border-blue-200/60">
+                <div>
+                  <span className="text-[10px] text-blue-600 uppercase tracking-wider block font-semibold">
+                    Offer Description
+                  </span>
+                  <span>{recommendation.offerDescription}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-blue-600 uppercase tracking-wider block font-semibold">
+                    Target Channels
+                  </span>
+                  <span>{recommendation.channels.join(", ")}</span>
+                </div>
+              </div>
+            </div>
+
             <div className="border border-slate-200 rounded-xl overflow-hidden mb-4">
               <div className="bg-slate-900 px-5 py-3 flex items-center gap-3">
                 <div className="flex gap-1.5">
@@ -264,7 +427,7 @@ export function CampaignCreatePage({
                   <div className="w-3 h-3 rounded-full bg-emerald-400" />
                 </div>
                 <span className="text-slate-400 text-xs">
-                  Email Preview — Complete Your Run
+                  Email Preview — {recommendation.campaignName}
                 </span>
               </div>
               <div className="p-6 bg-slate-50">
@@ -273,26 +436,35 @@ export function CampaignCreatePage({
                     <p className="text-xs font-medium text-blue-200 mb-1">
                       SOLEX × GROWTHOS
                     </p>
-                    <h3 className="text-lg font-bold">Complete Your Run 🏃</h3>
+                    <h3 className="text-lg font-bold">
+                      {recommendation.headline}
+                    </h3>
                     <p className="text-sm text-blue-100 mt-1">
                       You're one step away from your perfect kit.
                     </p>
                   </div>
                   <div className="p-5">
                     <p className="text-xs text-slate-600 leading-relaxed mb-4">
-                      You recently grabbed a pair of running shoes from us —
-                      great choice! Pair them with our performance running socks
-                      for the ultimate comfort.
+                      {recommendation.body}
                     </p>
                     <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-4 text-center">
                       <p className="text-xs text-slate-500 line-through mono">
-                        ₹3,199
+                        ₹
+                        {(
+                          opp.sourceProduct.price + opp.recommendedProduct.price
+                        ).toLocaleString()}
                       </p>
                       <p className="text-xl font-bold text-blue-700 mono">
-                        ₹2,799
+                        ₹{recommendation.suggestedBundlePrice.toLocaleString()}
                       </p>
                       <p className="text-xs text-emerald-600 font-medium">
-                        Save ₹400 — Today only
+                        Save ₹
+                        {(
+                          opp.sourceProduct.price +
+                          opp.recommendedProduct.price -
+                          recommendation.suggestedBundlePrice
+                        ).toLocaleString()}{" "}
+                        — Limited offer
                       </p>
                     </div>
                     <button className="w-full py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg">
@@ -311,15 +483,28 @@ export function CampaignCreatePage({
             <h2 className="text-base font-semibold text-slate-900 mb-5">
               Review & Launch
             </h2>
-            <div className="flex flex-col gap-0 mb-6 border border-slate-100 rounded-xl overflow-hidden">
+            <div className="flex flex-col gap-0 mb-5 border border-slate-100 rounded-xl overflow-hidden">
               {[
-                { label: "Campaign", value: '"Complete Your Run"' },
-                { label: "Type", value: "Cross-sell Bundle" },
+                {
+                  label: "Campaign",
+                  value: `"${recommendation.campaignName}"`,
+                },
+                {
+                  label: "Type",
+                  value:
+                    recommendation.campaignType === "bundle"
+                      ? "Cross-sell Bundle"
+                      : recommendation.campaignType.charAt(0).toUpperCase() +
+                        recommendation.campaignType.slice(1),
+                },
                 {
                   label: "Bundle Price",
-                  value: `₹${(opp.sourceProduct.price + Math.round(opp.recommendedProduct.price * 0.6)).toLocaleString()}`,
+                  value: `₹${recommendation.suggestedBundlePrice.toLocaleString()}`,
                 },
-                { label: "Channel", value: "Email + WhatsApp" },
+                {
+                  label: "Channels",
+                  value: recommendation.channels.join(" + "),
+                },
                 {
                   label: "Audience Size",
                   value: `${opp.estimatedEligibleCustomers.toLocaleString()} customers`,
@@ -342,6 +527,22 @@ export function CampaignCreatePage({
                   </span>
                 </div>
               ))}
+            </div>
+
+            {/* AI Strategy Summary Callout */}
+            <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl mb-5">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <span className="text-blue-600">{Icons.sparkle}</span>
+                <span className="text-xs font-semibold text-blue-900">
+                  AI Campaign Rationale & Goal
+                </span>
+              </div>
+              <p className="text-xs text-slate-700 leading-relaxed mb-1.5">
+                {recommendation.rationale}
+              </p>
+              <p className="text-xs text-blue-800 font-medium">
+                <strong>Goal:</strong> {recommendation.expectedGoal}
+              </p>
             </div>
 
             {/* AI Pre-Launch Checks */}

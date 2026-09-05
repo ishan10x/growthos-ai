@@ -2,7 +2,7 @@ import { useState, useMemo } from "react"
 import type React from "react"
 import { Icons } from "../components/common/Icons"
 import { Badge } from "../components/common/Badge"
-import { aiActivityLogs } from "../data/mockData"
+import { aiService } from "../services/aiService"
 
 export function AIActivityPage() {
   const [selectedCategory, setSelectedCategory] = useState("All")
@@ -13,6 +13,8 @@ export function AIActivityPage() {
     recommendation: "bg-purple-100 text-purple-600",
     pending: "bg-amber-100 text-amber-600",
     result: "bg-emerald-100 text-emerald-600",
+    fallback: "bg-teal-100 text-teal-600",
+    error: "bg-red-100 text-red-600",
   }
 
   const typeIcons: Record<string, React.ReactNode> = {
@@ -21,13 +23,17 @@ export function AIActivityPage() {
     recommendation: Icons.ai,
     pending: Icons.bell,
     result: Icons.check,
+    fallback: Icons.sparkle,
+    error: Icons.bell,
   }
 
+  const logs = useMemo(() => aiService.getAIActivityLogs(), [])
+
   const filteredLogs = useMemo(() => {
-    return aiActivityLogs.filter((log) => {
+    return logs.filter((log) => {
       if (selectedCategory === "All") return true
       if (selectedCategory === "Opportunities")
-        return log.type === "opportunity"
+        return log.type === "opportunity" || log.type === "fallback"
       if (selectedCategory === "Analysis") return log.type === "analysis"
       if (selectedCategory === "Campaigns") {
         return (
@@ -38,7 +44,7 @@ export function AIActivityPage() {
       }
       return true
     })
-  }, [selectedCategory])
+  }, [logs, selectedCategory])
 
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50 p-6">

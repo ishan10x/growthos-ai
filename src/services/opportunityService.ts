@@ -1,6 +1,6 @@
-import type { CrossSellOpportunity } from "../types/dataFoundation"
-import { getMerchantDataset } from "../data/syntheticGenerator"
-import { findCrossSellOpportunities } from "./opportunityEngine"
+import type { CrossSellOpportunity } from "../types/dataFoundation.ts"
+import { getMerchantDataset } from "../data/syntheticGenerator.ts"
+import { findCrossSellOpportunities } from "./opportunityEngine.ts"
 
 // Singleton cache for calculated opportunities
 let cachedOpportunities: CrossSellOpportunity[] | null = null

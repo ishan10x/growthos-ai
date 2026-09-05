@@ -541,7 +541,7 @@ export function generateSyntheticMerchantData(
       type: "pending",
       title: "Merchant Approval Required",
       detail:
-        "Campaign requires merchant review before launch. Waiting for approval from Arjun Kumar.",
+        "Campaign requires merchant review before launch. Waiting for approval from Ishan Khandelwal.",
       meta: "SLA: 24 hours · Escalation: Growth Manager",
       status: "pending",
     },

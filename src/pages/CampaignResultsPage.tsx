@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react"
 import {
   AreaChart,
   LineChart,
@@ -9,17 +10,169 @@ import {
   ResponsiveContainer,
 } from "recharts"
 import type { Page } from "../types"
+import type { CampaignResultModel } from "../types/razorpay"
+import { razorpayClientService } from "../services/razorpayClientService"
 import { Icons } from "../components/common/Icons"
 import { Badge } from "../components/common/Badge"
 import { StatCard } from "../components/common/StatCard"
 import { SectionHeader } from "../components/common/SectionHeader"
 import { campaignsList, campaignResultsTimeline } from "../data/mockData"
+import { campaignExecutionStore } from "../services/campaignExecutionStore"
 
 export interface CampaignResultsPageProps {
   onNav: (p: Page) => void
 }
 
 export function CampaignResultsPage({ onNav }: CampaignResultsPageProps) {
+  const [razorpayModel, setRazorpayModel] = useState<CampaignResultModel>(
+    () => {
+      const store = campaignExecutionStore.getState()
+      if (store.status !== "idle") {
+        return {
+          campaignId: store.campaignId,
+          campaignName: store.campaignName,
+          expectedIncrementalRevenue: store.expectedIncrementalRevenue,
+          targetAudience: store.targetAudience,
+          verifiedPaymentCount: store.verifiedPaymentCount,
+          verifiedTestRevenue: store.verifiedTestRevenue,
+          actualTestRevenueCaptured: store.verifiedTestRevenue,
+          paymentLinkId:
+            store.paymentLinkId || "plink_test_complete_your_run_01",
+          paymentIds: store.verifiedPaymentIds,
+          lastPaymentAt:
+            store.lastVerifiedPaymentTimestamp || "2026-08-31T15:10:00.000Z",
+          verificationStatus: "verified",
+          testMode: true,
+          payments: store.verifiedPaymentIds.map((pid) => ({
+            campaignId: store.campaignId,
+            paymentLinkId:
+              store.paymentLinkId || "plink_test_complete_your_run_01",
+            paymentId: pid,
+            amount: store.bundlePrice,
+            currency: "INR",
+            status: "captured",
+            timestamp:
+              store.lastVerifiedPaymentTimestamp || new Date().toISOString(),
+            verificationStatus: "verified",
+            testMode: true,
+          })),
+        }
+      }
+      return {
+        campaignId: "camp_prod_running_shoes_prod_running_socks",
+        campaignName: "Complete Your Run",
+        expectedIncrementalRevenue: 41602,
+        targetAudience: 2772,
+        verifiedPaymentCount: 2,
+        verifiedTestRevenue: 5598,
+        actualTestRevenueCaptured: 5598,
+        paymentLinkId: "plink_test_complete_your_run_01",
+        paymentIds: ["pay_test_complete_run_001", "pay_test_complete_run_002"],
+        lastPaymentAt: "2026-08-31T15:10:00.000Z",
+        verificationStatus: "verified",
+        testMode: true,
+        payments: [
+          {
+            campaignId: "camp_prod_running_shoes_prod_running_socks",
+            paymentLinkId: "plink_test_complete_your_run_01",
+            paymentId: "pay_test_complete_run_001",
+            amount: 2799,
+            currency: "INR",
+            status: "captured",
+            timestamp: "2026-08-31T14:35:00.000Z",
+            verificationStatus: "verified",
+            testMode: true,
+          },
+          {
+            campaignId: "camp_prod_running_shoes_prod_running_socks",
+            paymentLinkId: "plink_test_complete_your_run_01",
+            paymentId: "pay_test_complete_run_002",
+            amount: 2799,
+            currency: "INR",
+            status: "captured",
+            timestamp: "2026-08-31T15:10:00.000Z",
+            verificationStatus: "verified",
+            testMode: true,
+          },
+        ],
+      }
+    },
+  )
+
+  useEffect(() => {
+    // 1. Subscribe to shared execution store updates
+    const unsubscribe = campaignExecutionStore.subscribe(() => {
+      const s = campaignExecutionStore.getState()
+      if (s.status !== "idle") {
+        setRazorpayModel((prev) => ({
+          ...prev,
+          campaignId: s.campaignId,
+          campaignName: s.campaignName,
+          targetAudience: s.targetAudience,
+          bundlePrice: s.bundlePrice,
+          expectedIncrementalRevenue: s.expectedIncrementalRevenue,
+          verifiedPaymentCount: s.verifiedPaymentCount,
+          verifiedTestRevenue: s.verifiedTestRevenue,
+          actualTestRevenueCaptured: s.verifiedTestRevenue,
+          paymentLinkId: s.paymentLinkId || prev.paymentLinkId,
+          paymentIds: s.verifiedPaymentIds,
+        }))
+      }
+    })
+
+    // 2. Fetch latest server payments
+    razorpayClientService
+      .getCampaignPayments(
+        "camp_prod_running_shoes_prod_running_socks",
+        41602,
+        2772,
+        "Complete Your Run",
+      )
+      .then((m) => {
+        if (m && m.verifiedPaymentCount >= 0) {
+          setRazorpayModel(m)
+          // Also sync to shared execution store
+          campaignExecutionStore.syncFromCampaignResult({
+            campaignId: m.campaignId,
+            campaignName: m.campaignName,
+            targetAudience: m.targetAudience,
+            bundlePrice: 2799,
+            expectedIncrementalRevenue: m.expectedIncrementalRevenue,
+            verifiedPaymentCount: m.verifiedPaymentCount,
+            verifiedPaymentIds: m.paymentIds || [],
+            verifiedTestRevenue: m.actualTestRevenueCaptured,
+            paymentLinkId: m.paymentLinkId,
+            status: m.verifiedPaymentCount > 0 ? "active" : "launched",
+            isTestMode: m.testMode,
+          })
+        }
+      })
+
+    return unsubscribe
+  }, [])
+
+  const displayCampaigns = campaignsList.map((c) => {
+    if (c.name.includes("Complete Your Run")) {
+      const convRate =
+        razorpayModel.targetAudience > 0
+          ? (
+              (razorpayModel.verifiedPaymentCount /
+                razorpayModel.targetAudience) *
+              100
+            ).toFixed(2)
+          : "0.07"
+      return {
+        ...c,
+        customers: razorpayModel.targetAudience,
+        purchases: razorpayModel.verifiedPaymentCount,
+        revenue: `₹${razorpayModel.actualTestRevenueCaptured.toLocaleString()}`,
+        uplift: `+${convRate}%`,
+        roi: "— (Test Mode)",
+      }
+    }
+    return c
+  })
+
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50 p-6">
       <div className="flex items-start justify-between mb-6">
@@ -76,9 +229,11 @@ export function CampaignResultsPage({ onNav }: CampaignResultsPageProps) {
             <p className="text-[10px] text-slate-400 mb-1">
               Expected Incremental Revenue
             </p>
-            <p className="text-2xl font-bold text-blue-700 mono">₹42,600</p>
+            <p className="text-2xl font-bold text-blue-700 mono">
+              ₹{razorpayModel.expectedIncrementalRevenue.toLocaleString()}
+            </p>
             <p className="text-xs text-slate-400 mt-0.5">
-              AI projection before launch
+              AI deterministic projection before launch
             </p>
           </div>
         </div>
@@ -86,28 +241,79 @@ export function CampaignResultsPage({ onNav }: CampaignResultsPageProps) {
           <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
             {Icons.check}
           </div>
-          <div>
-            <p className="text-[10px] text-emerald-600 uppercase tracking-wider font-semibold mb-0.5">
-              Actual Result
-            </p>
+          <div className="flex-1">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] text-emerald-600 uppercase tracking-wider font-semibold mb-0.5">
+                Actual Result
+              </p>
+              <Badge variant="emerald">Razorpay Test Mode</Badge>
+            </div>
             <p className="text-[10px] text-slate-400 mb-1">
-              Actual Incremental Revenue
+              Actual Test Revenue Captured
             </p>
-            <p className="text-2xl font-bold text-emerald-700 mono">₹47,200</p>
+            <p className="text-2xl font-bold text-emerald-700 mono">
+              ₹{razorpayModel.actualTestRevenueCaptured.toLocaleString()}
+            </p>
             <p className="text-xs text-slate-400 mt-0.5">
-              Verified · attributable to campaign
+              HMAC-SHA256 Verified · {razorpayModel.verifiedPaymentCount}{" "}
+              Sandbox payments
             </p>
           </div>
         </div>
       </div>
 
+      {/* Razorpay Test Mode Verified Transactions (if test payments recorded) */}
+      {razorpayModel.payments.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-xl mb-5 overflow-hidden">
+          <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-blue-600">{Icons.sparkle}</span>
+              <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                Razorpay Test Mode Verified Transactions
+              </h2>
+            </div>
+            <Badge variant="blue">Test Mode Only</Badge>
+          </div>
+          <div className="divide-y divide-slate-100 text-xs">
+            {razorpayModel.payments.map((p) => (
+              <div
+                key={p.paymentId}
+                className="px-5 py-3 flex items-center justify-between"
+              >
+                <div>
+                  <span className="font-mono font-semibold text-slate-800">
+                    {p.paymentId}
+                  </span>
+                  <span className="text-slate-400 ml-2 font-mono">
+                    ({p.paymentLinkId})
+                  </span>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {new Date(p.timestamp).toLocaleString()}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="font-bold mono text-slate-900 text-sm">
+                    ₹{p.amount.toLocaleString()} {p.currency}
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    HMAC-SHA256 Verified
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* AI result message */}
       <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-3 mb-6">
         <span className="text-emerald-500 flex-shrink-0">{Icons.sparkle}</span>
         <p className="text-sm text-emerald-800 font-medium">
-          Campaign performed{" "}
-          <span className="font-bold">11% better than predicted.</span> GrowthOS
-          has updated its model based on these results.
+          <span className="font-bold">
+            {razorpayModel.verifiedPaymentCount} Razorpay Test Mode payment
+            {razorpayModel.verifiedPaymentCount === 1 ? "" : "s"} verified.
+          </span>{" "}
+          GrowthOS recorded the result for campaign evaluation.
         </p>
       </div>
 
@@ -148,7 +354,7 @@ export function CampaignResultsPage({ onNav }: CampaignResultsPageProps) {
             </tr>
           </thead>
           <tbody>
-            {campaignsList.map((c) => (
+            {displayCampaigns.map((c) => (
               <tr
                 key={c.name}
                 className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors"
@@ -195,13 +401,29 @@ export function CampaignResultsPage({ onNav }: CampaignResultsPageProps) {
         <div className="bg-white border border-slate-200 rounded-xl p-5">
           <SectionHeader
             title='"Complete Your Run" — Performance'
-            subtitle="Active campaign · Launched Aug 31, 2026"
+            subtitle="Active campaign · Razorpay Test Mode"
           />
           <div className="grid grid-cols-3 gap-3 mb-5">
             {[
-              { label: "Customers Targeted", value: "2,840" },
-              { label: "Purchases Made", value: "184" },
-              { label: "Conversion Rate", value: "6.5%" },
+              {
+                label: "Customers Targeted",
+                value: razorpayModel.targetAudience.toLocaleString(),
+              },
+              {
+                label: "Purchases Made",
+                value: razorpayModel.verifiedPaymentCount.toLocaleString(),
+              },
+              {
+                label: "Conversion Rate",
+                value:
+                  razorpayModel.targetAudience > 0
+                    ? `${(
+                        (razorpayModel.verifiedPaymentCount /
+                          razorpayModel.targetAudience) *
+                        100
+                      ).toFixed(2)}%`
+                    : "0.07%",
+              },
             ].map((m) => (
               <div
                 key={m.label}
@@ -276,15 +498,31 @@ export function CampaignResultsPage({ onNav }: CampaignResultsPageProps) {
         <div className="bg-white border border-slate-200 rounded-xl p-5">
           <SectionHeader
             title="Revenue Impact Breakdown"
-            subtitle='"Complete Your Run" — verified results'
+            subtitle='"Complete Your Run" — verified test results'
           />
 
           {/* Key campaign outcomes */}
           <div className="grid grid-cols-3 gap-3 mb-5">
             {[
-              { label: "Customers Targeted", value: "2,840" },
-              { label: "Purchases", value: "184" },
-              { label: "Conversion Uplift", value: "+3.5%" },
+              {
+                label: "Customers Targeted",
+                value: razorpayModel.targetAudience.toLocaleString(),
+              },
+              {
+                label: "Purchases",
+                value: razorpayModel.verifiedPaymentCount.toLocaleString(),
+              },
+              {
+                label: "Conversion Uplift",
+                value:
+                  razorpayModel.targetAudience > 0
+                    ? `+${(
+                        (razorpayModel.verifiedPaymentCount /
+                          razorpayModel.targetAudience) *
+                        100
+                      ).toFixed(2)}%`
+                    : "+0.07%",
+              },
             ].map((m) => (
               <div
                 key={m.label}
@@ -309,16 +547,16 @@ export function CampaignResultsPage({ onNav }: CampaignResultsPageProps) {
                 note: "Baseline (30d pre-campaign)",
               },
               {
-                label: "Actual Incremental Revenue",
-                value: "+₹47,200",
+                label: "Actual Test Revenue Captured",
+                value: `+₹${razorpayModel.actualTestRevenueCaptured.toLocaleString()}`,
                 color: "text-emerald-600",
-                note: "Verified · attributable to campaign",
+                note: "HMAC-SHA256 verified · Razorpay Test Mode",
               },
               {
-                label: "Revenue After Campaign",
-                value: "₹18.87L",
+                label: "Total with Test Revenue",
+                value: "₹18.46L",
                 color: "text-blue-700",
-                note: "Total (post-campaign)",
+                note: "Store baseline + sandbox captured",
               },
             ].map((r, i) => (
               <div
@@ -343,25 +581,35 @@ export function CampaignResultsPage({ onNav }: CampaignResultsPageProps) {
           {/* AI Forecast vs Actual */}
           <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 mb-4">
             <p className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold mb-3">
-              AI Forecast vs. Actual
+              AI Forecast vs. Actual (Test Mode)
             </p>
             <div className="grid grid-cols-2 gap-3">
               <div className="text-center">
                 <p className="text-[10px] text-blue-400 uppercase tracking-wider mb-1">
                   Expected
                 </p>
-                <p className="text-lg font-bold text-blue-600 mono">₹42,600</p>
-                <p className="text-[10px] text-slate-400">AI projection</p>
+                <p className="text-lg font-bold text-blue-600 mono">
+                  ₹{razorpayModel.expectedIncrementalRevenue.toLocaleString()}
+                </p>
+                <p className="text-[10px] text-slate-400">
+                  AI projected target
+                </p>
               </div>
               <div className="text-center border-l border-slate-200">
                 <p className="text-[10px] text-emerald-600 uppercase tracking-wider mb-1">
-                  Actual
+                  Actual Test Captured
                 </p>
                 <p className="text-lg font-bold text-emerald-600 mono">
-                  ₹47,200
+                  ₹{razorpayModel.actualTestRevenueCaptured.toLocaleString()}
                 </p>
-                <p className="text-[10px] text-emerald-500 font-medium">
-                  +11% vs. forecast
+                <p className="text-[10px] text-emerald-600 font-medium">
+                  {razorpayModel.expectedIncrementalRevenue > 0
+                    ? `${(
+                        (razorpayModel.actualTestRevenueCaptured /
+                          razorpayModel.expectedIncrementalRevenue) *
+                        100
+                      ).toFixed(1)}% of target · Sandbox`
+                    : "Test Mode"}
                 </p>
               </div>
             </div>
@@ -369,8 +617,11 @@ export function CampaignResultsPage({ onNav }: CampaignResultsPageProps) {
 
           <div className="grid grid-cols-2 gap-3">
             {[
-              { label: "AOV Increase", value: "+₹300" },
-              { label: "Campaign ROI", value: "4.7×" },
+              { label: "Bundle Price (AOV)", value: "₹2,799" },
+              {
+                label: "Verified Transactions",
+                value: `${razorpayModel.verifiedPaymentCount} Payments`,
+              },
             ].map((m) => (
               <div
                 key={m.label}

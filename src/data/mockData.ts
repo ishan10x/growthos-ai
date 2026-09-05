@@ -153,11 +153,11 @@ export const campaignsList: CampaignItem[] = [
   {
     name: '"Complete Your Run"',
     status: "active",
-    customers: 2840,
-    purchases: 184,
-    revenue: "₹47,200",
-    uplift: "+3.5%",
-    roi: "4.7×",
+    customers: 2772,
+    purchases: 2,
+    revenue: "₹5,598",
+    uplift: "+0.07%",
+    roi: "— (Test Mode)",
   },
   {
     name: '"Premium Insoles Offer"',
@@ -258,6 +258,60 @@ export const customersList: CustomerItem[] = [
 // ─── AI Activity Logs ─────────────────────────────────────────────────────────
 export const aiActivityLogs: AIActivityLog[] = [
   {
+    time: "Aug 31, 2026 · 15:10",
+    title: "Test Revenue Captured",
+    type: "result",
+    detail:
+      "Captured ₹5,598 across 2 verified Razorpay Test Mode transactions.",
+    meta: "Verified Payments: 2 · Sandbox Revenue: ₹5,598 · Bundle Price: ₹2,799",
+    status: "success",
+  },
+  {
+    time: "Aug 31, 2026 · 15:08",
+    title: "Razorpay Test Payment Verified",
+    type: "result",
+    detail:
+      "Cryptographic HMAC-SHA256 signature verified authentic for payment pay_test_complete_run_002.",
+    meta: "Payment: ₹2,799 INR · Link: plink_test_complete_your_run_01 · Status: Captured",
+    status: "success",
+  },
+  {
+    time: "Aug 31, 2026 · 14:35",
+    title: "Razorpay Test Payment Verified",
+    type: "result",
+    detail:
+      "Cryptographic HMAC-SHA256 signature verified authentic for payment pay_test_complete_run_001.",
+    meta: "Payment: ₹2,799 INR · Link: plink_test_complete_your_run_01 · Status: Captured",
+    status: "success",
+  },
+  {
+    time: "Aug 31, 2026 · 14:30",
+    title: "Razorpay Test Payment Link Created",
+    type: "recommendation",
+    detail:
+      'Created sandbox payment link plink_test_complete_your_run_01 for "Complete Your Run" at ₹2,799.',
+    meta: "Link ID: plink_test_complete_your_run_01 · Mode: Test Mode · Sandbox Only",
+    status: "completed",
+  },
+  {
+    time: "Aug 31, 2026 · 14:25",
+    title: "Campaign Launched",
+    type: "recommendation",
+    detail:
+      '"Complete Your Run" initiated in Razorpay Test Mode for 2,772 eligible customers.',
+    meta: "Target: 2,772 customers · Mode: Test Mode · Sandbox Active",
+    status: "completed",
+  },
+  {
+    time: "Aug 31, 2026 · 14:21",
+    title: "Merchant Approval Received",
+    type: "recommendation",
+    detail:
+      'Merchant approved execution of campaign "Complete Your Run" at ₹2,799 for 2,772 customers.',
+    meta: "Approver: Ishan Khandelwal · Action Gate: Passed · Mode: Test Only",
+    status: "completed",
+  },
+  {
     time: "Aug 31, 2026 · 14:23",
     type: "opportunity",
     title: "Opportunity Discovered",
@@ -282,15 +336,6 @@ export const aiActivityLogs: AIActivityLog[] = [
       'AI generated "Complete Your Run" campaign with bundle pricing of ₹2,799',
     meta: "Channel mix: Email 60% + WhatsApp 40% · Expected conversion: 6.5%",
     status: "completed",
-  },
-  {
-    time: "Aug 31, 2026 · 14:20",
-    title: "Merchant Approval Required",
-    type: "pending",
-    detail:
-      "Campaign requires merchant review before launch. Waiting for approval from Arjun Kumar.",
-    meta: "SLA: 24 hours · Escalation: Growth Manager",
-    status: "pending",
   },
   {
     time: "Aug 30, 2026 · 09:42",

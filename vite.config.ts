@@ -1,4 +1,9 @@
-import { defineConfig, type HtmlTagDescriptor, type Plugin } from "vite"
+import {
+  defineConfig,
+  loadEnv,
+  type HtmlTagDescriptor,
+  type Plugin,
+} from "vite"
 import react from "@vitejs/plugin-react"
 import tailwindcss from "@tailwindcss/vite"
 import path from "node:path"
@@ -7,6 +12,9 @@ import siteConfiguration from "./.figma/make/site.json"
 
 // Vite config — https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "")
+  Object.assign(process.env, env)
+
   // .figma/make/deploy-preview passes `--mode development` for cached-preview builds.
   const emitSourcemaps = mode === "development"
 
@@ -26,6 +34,7 @@ export default defineConfig(({ mode }) => {
       figmaReactRefreshBoundaryFallback(),
       figmaMakeKitPlugin({ storiesGlob: "/src/**/*.stories.{ts,tsx,js,jsx}" }),
       growthosAIServerPlugin(),
+      growthosRazorpayServerPlugin(),
     ],
     resolve: {
       alias: {
@@ -124,6 +133,126 @@ function growthosAIServerPlugin(): Plugin {
             res.end(JSON.stringify({ error: String(err) }))
           }
         })
+      })
+    },
+  }
+}
+
+/**
+ * GrowthOS Secure Server-Side Razorpay Test Mode Boundary
+ * Serves /api/razorpay/* endpoints inside Vite dev server / Node.js runtime.
+ * Never exposes RAZORPAY_KEY_SECRET to the client.
+ */
+function growthosRazorpayServerPlugin(): Plugin {
+  return {
+    name: "growthos-razorpay-server",
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        if (!req.url?.startsWith("/api/razorpay/")) {
+          return next()
+        }
+
+        const urlObj = new URL(req.url, "http://localhost:8443")
+        const pathname = urlObj.pathname
+
+        // 1. GET /api/razorpay/status
+        if (req.method === "GET" && pathname === "/api/razorpay/status") {
+          res.setHeader("Content-Type", "application/json")
+          const { getRazorpayStatus } = await import(
+            "./src/services/razorpayServerService.ts"
+          )
+          res.end(JSON.stringify(getRazorpayStatus()))
+          return
+        }
+
+        // 2. GET /api/razorpay/campaign-payments
+        if (
+          req.method === "GET" &&
+          pathname.startsWith("/api/razorpay/campaign-payments")
+        ) {
+          const campaignId =
+            urlObj.searchParams.get("campaignId") || "camp_running_shoes_socks"
+          res.setHeader("Content-Type", "application/json")
+          const { getCampaignResultModel } = await import(
+            "./src/services/razorpayServerService.ts"
+          )
+          res.end(JSON.stringify(getCampaignResultModel(campaignId)))
+          return
+        }
+
+        // 3. POST endpoints require reading JSON body
+        if (req.method === "POST") {
+          let body = ""
+          req.on("data", (chunk) => {
+            body += chunk
+          })
+          req.on("end", async () => {
+            res.setHeader("Content-Type", "application/json")
+            try {
+              const payload = JSON.parse(body || "{}")
+              const {
+                createTestPaymentLink,
+                verifyRazorpayPaymentSignature,
+                generateSimulatedTestPayment,
+                getRazorpayCredentials,
+              } = await import("./src/services/razorpayServerService.ts")
+
+              // POST /api/razorpay/payment-link
+              if (pathname === "/api/razorpay/payment-link") {
+                const result = await createTestPaymentLink(payload)
+                res.statusCode = result.success ? 200 : 422
+                res.end(JSON.stringify(result))
+                return
+              }
+
+              // POST /api/razorpay/verify-payment
+              if (pathname === "/api/razorpay/verify-payment") {
+                const result = verifyRazorpayPaymentSignature(payload)
+                res.statusCode = result.verified ? 200 : 400
+                res.end(JSON.stringify(result))
+                return
+              }
+
+              // POST /api/razorpay/simulate-payment (for testing / demo sandbox)
+              if (pathname === "/api/razorpay/simulate-payment") {
+                const credentials = getRazorpayCredentials()
+                const secret =
+                  credentials.keySecret || "growthos_test_mode_sandbox_secret"
+                const sim = generateSimulatedTestPayment(
+                  payload.paymentLinkId || "plink_test_sample",
+                  secret,
+                  payload.amount || 2799,
+                )
+                const verifyResult = verifyRazorpayPaymentSignature(
+                  {
+                    razorpay_payment_id: sim.paymentId,
+                    razorpay_payment_link_id:
+                      payload.paymentLinkId || "plink_test_sample",
+                    razorpay_signature: sim.signature,
+                    campaignId:
+                      payload.campaignId || "camp_running_shoes_socks",
+                    amount: payload.amount || 2799,
+                  },
+                  secret,
+                )
+                res.statusCode = 200
+                res.end(JSON.stringify(verifyResult))
+                return
+              }
+
+              res.statusCode = 404
+              res.end(JSON.stringify({ error: "Endpoint not found" }))
+            } catch (err) {
+              res.statusCode = 500
+              res.end(JSON.stringify({ error: String(err) }))
+            }
+          })
+          return
+        }
+
+        res.statusCode = 405
+        res.setHeader("Content-Type", "application/json")
+        res.end(JSON.stringify({ error: "Method Not Allowed" }))
       })
     },
   }

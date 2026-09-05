@@ -43,10 +43,12 @@ export function TopBar({ onNav }: TopBarProps) {
         {/* Profile */}
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-            <span className="text-white text-xs font-semibold">AK</span>
+            <span className="text-white text-xs font-semibold">IK</span>
           </div>
           <div className="hidden sm:block">
-            <p className="text-xs font-semibold text-slate-700">Arjun Kumar</p>
+            <p className="text-xs font-semibold text-slate-700">
+              Ishan Khandelwal
+            </p>
             <p className="text-[10px] text-slate-400">Growth Manager</p>
           </div>
         </div>

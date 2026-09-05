@@ -1,3 +1,4 @@
+import { useMemo } from "react"
 import {
   AreaChart,
   Area,
@@ -9,6 +10,7 @@ import {
 } from "recharts"
 import type { Page } from "../types"
 import type { CrossSellOpportunity } from "../types/dataFoundation"
+import { useCampaignExecution } from "../hooks"
 import { Icons } from "../components/common/Icons"
 import { Badge } from "../components/common/Badge"
 import { StatCard } from "../components/common/StatCard"
@@ -31,6 +33,10 @@ export function DashboardPage({
   onNav,
   onSelectOpportunity,
 }: DashboardPageProps) {
+  const executionState = useCampaignExecution()
+  const isExecuted =
+    executionState.status !== "idle" || executionState.verifiedPaymentCount > 0
+
   const opportunities = getCalculatedOpportunities()
   const primaryOpp = getPrimaryOpportunity()
   const secondaryOpps = opportunities.filter(
@@ -46,36 +52,173 @@ export function DashboardPage({
     0,
   )
 
-  const aiActivities = [
-    {
-      time: "2m ago",
-      icon: Icons.sparkle,
-      text: "New cross-sell opportunity identified",
-      label: `${primaryOpp.sourceProduct.name} → ${primaryOpp.recommendedProduct.name}`,
-      status: "new",
-    },
-    {
-      time: "15m ago",
-      icon: Icons.info,
-      text: "Customer segment analyzed",
-      label: `${primaryOpp.estimatedEligibleCustomers.toLocaleString()} eligible customers`,
-      status: "info",
-    },
-    {
-      time: "1h ago",
-      icon: Icons.check,
-      text: "Campaign recommendation generated",
-      label: '"Complete Your Run"',
-      status: "success",
-    },
-    {
-      time: "3h ago",
-      icon: Icons.bell,
-      text: "Merchant approval required",
-      label: "Review & Launch",
-      status: "warning",
-    },
-  ]
+  const aiActivities = useMemo(() => {
+    // 1. When no campaign has been executed in the current session, preserve the existing Dashboard appearance
+    if (!isExecuted) {
+      return [
+        {
+          time: "2m ago",
+          icon: Icons.sparkle,
+          text: "New cross-sell opportunity identified",
+          label: `${primaryOpp.sourceProduct.name} → ${primaryOpp.recommendedProduct.name}`,
+          status: "new",
+        },
+        {
+          time: "15m ago",
+          icon: Icons.info,
+          text: "Customer segment analyzed",
+          label: `${primaryOpp.estimatedEligibleCustomers.toLocaleString()} eligible customers`,
+          status: "info",
+        },
+        {
+          time: "1h ago",
+          icon: Icons.check,
+          text: "Campaign recommendation generated",
+          label: `"${executionState.campaignName || "Complete Your Run"}"`,
+          status: "success",
+        },
+        {
+          time: "3h ago",
+          icon: Icons.bell,
+          text: "Merchant approval required",
+          label: "Review & Launch",
+          status: "warning",
+        },
+      ]
+    }
+
+    // 2. Dynamic execution states: 2+ payments, 1 payment, launched, or approved
+    if (executionState.verifiedPaymentCount >= 2) {
+      return [
+        {
+          time: "Just now",
+          icon: Icons.check,
+          text: "Test Revenue Captured",
+          label: `Captured ₹${executionState.verifiedTestRevenue.toLocaleString()} across ${executionState.verifiedPaymentCount} verified Razorpay Test Mode transactions.`,
+          status: "success",
+        },
+        {
+          time: "2m ago",
+          icon: Icons.check,
+          text: "Razorpay Test Payment Verified",
+          label: `${executionState.verifiedPaymentCount} test payments verified via HMAC-SHA256 (₹${executionState.bundlePrice.toLocaleString()} each)`,
+          status: "success",
+        },
+        {
+          time: "15m ago",
+          icon: Icons.check,
+          text: "Campaign Launched",
+          label: `"${executionState.campaignName}" live in Razorpay Test Mode`,
+          status: "success",
+        },
+        {
+          time: "30m ago",
+          icon: Icons.check,
+          text: "Merchant Approval Received",
+          label: `Approved by ${executionState.approverName} · ₹${executionState.bundlePrice.toLocaleString()} bundle`,
+          status: "success",
+        },
+      ]
+    }
+
+    if (executionState.verifiedPaymentCount === 1) {
+      return [
+        {
+          time: "Just now",
+          icon: Icons.check,
+          text: "Test Revenue Captured",
+          label: `₹${executionState.verifiedTestRevenue.toLocaleString()} Test Mode revenue captured · 1 verified payment`,
+          status: "success",
+        },
+        {
+          time: "2m ago",
+          icon: Icons.check,
+          text: "Razorpay Test Payment Verified",
+          label: `Cryptographic HMAC-SHA256 signature verified authentic (₹${executionState.bundlePrice.toLocaleString()})`,
+          status: "success",
+        },
+        {
+          time: "15m ago",
+          icon: Icons.check,
+          text: "Campaign Launched",
+          label: `"${executionState.campaignName}" live in Razorpay Test Mode`,
+          status: "success",
+        },
+        {
+          time: "30m ago",
+          icon: Icons.check,
+          text: "Merchant Approval Received",
+          label: `Approved by ${executionState.approverName} · ₹${executionState.bundlePrice.toLocaleString()} bundle`,
+          status: "success",
+        },
+      ]
+    }
+
+    if (executionState.status === "launched") {
+      return [
+        {
+          time: "Just now",
+          icon: Icons.check,
+          text: "Campaign Launched",
+          label: `"${executionState.campaignName}" live in Razorpay Test Mode`,
+          status: "success",
+        },
+        {
+          time: "2m ago",
+          icon: Icons.check,
+          text: "Merchant Approval Received",
+          label: `Approved by ${executionState.approverName} · ₹${executionState.bundlePrice.toLocaleString()} bundle`,
+          status: "success",
+        },
+        {
+          time: "15m ago",
+          icon: Icons.check,
+          text: "Campaign recommendation generated",
+          label: `"${executionState.campaignName}"`,
+          status: "success",
+        },
+        {
+          time: "1h ago",
+          icon: Icons.info,
+          text: "Customer segment analyzed",
+          label: `${primaryOpp.estimatedEligibleCustomers.toLocaleString()} eligible customers`,
+          status: "info",
+        },
+      ]
+    }
+
+    // Approved status
+    return [
+      {
+        time: "Just now",
+        icon: Icons.check,
+        text: "Merchant Approval Received",
+        label: `Approved by ${executionState.approverName} · ₹${executionState.bundlePrice.toLocaleString()} bundle`,
+        status: "success",
+      },
+      {
+        time: "15m ago",
+        icon: Icons.check,
+        text: "Campaign recommendation generated",
+        label: `"${executionState.campaignName}"`,
+        status: "success",
+      },
+      {
+        time: "1h ago",
+        icon: Icons.info,
+        text: "Customer segment analyzed",
+        label: `${primaryOpp.estimatedEligibleCustomers.toLocaleString()} eligible customers`,
+        status: "info",
+      },
+      {
+        time: "2h ago",
+        icon: Icons.sparkle,
+        text: "New cross-sell opportunity identified",
+        label: `${primaryOpp.sourceProduct.name} → ${primaryOpp.recommendedProduct.name}`,
+        status: "new",
+      },
+    ]
+  }, [isExecuted, executionState, primaryOpp])
 
   const handleInvestigate = (opp: CrossSellOpportunity) => {
     onSelectOpportunity?.(opp)
@@ -284,6 +427,12 @@ export function DashboardPage({
                     <span>{Icons.sparkle}</span> AI Identified
                   </Badge>
                   <Badge variant="success">High Confidence</Badge>
+                  {isExecuted && (
+                    <Badge variant="emerald">
+                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full inline-block mr-1" />
+                      Active (Test Mode)
+                    </Badge>
+                  )}
                 </div>
                 <h3 className="text-base font-semibold text-slate-900 mt-2">
                   {primaryOpp.sourceProduct.name} →{" "}
@@ -300,6 +449,13 @@ export function DashboardPage({
                 <p className="text-xs text-slate-500 mt-0.5">
                   Expected incremental revenue
                 </p>
+                {executionState.verifiedTestRevenue > 0 && (
+                  <p className="text-xs font-semibold text-emerald-600 mt-1 mono">
+                    ₹{executionState.verifiedTestRevenue.toLocaleString()} Test
+                    Mode Captured ({executionState.verifiedPaymentCount}{" "}
+                    payments)
+                  </p>
+                )}
               </div>
             </div>
 
@@ -353,12 +509,21 @@ export function DashboardPage({
               >
                 Investigate
               </button>
-              <button
-                onClick={() => handleLaunch(primaryOpp)}
-                className="flex-1 px-4 py-2.5 bg-blue-600 text-sm font-semibold text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Launch Campaign
-              </button>
+              {isExecuted ? (
+                <button
+                  onClick={() => onNav("campaign-results")}
+                  className="flex-1 px-4 py-2.5 bg-emerald-600 text-sm font-semibold text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                >
+                  View Campaign Results
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleLaunch(primaryOpp)}
+                  className="flex-1 px-4 py-2.5 bg-blue-600 text-sm font-semibold text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Launch Campaign
+                </button>
+              )}
             </div>
           </div>
 

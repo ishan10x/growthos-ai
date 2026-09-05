@@ -9,24 +9,87 @@ import {
   ResponsiveContainer,
 } from "recharts"
 import type { Page } from "../types"
+import type { CrossSellOpportunity } from "../types/dataFoundation"
 import { Icons } from "../components/common/Icons"
 import { Badge } from "../components/common/Badge"
 import { ConfidenceMeter } from "../components/common/ConfidenceMeter"
-import {
-  customerSegmentData,
-  investigationMetrics,
-  investigationReasoning,
-} from "../data/mockData"
+import { customerSegmentData } from "../data/mockData"
+import { getPrimaryOpportunity } from "../services/opportunityService"
 
 export interface OpportunityInvestigationPageProps {
   onNav: (p: Page) => void
+  opportunity?: CrossSellOpportunity
 }
 
 export function OpportunityInvestigationPage({
   onNav,
+  opportunity,
 }: OpportunityInvestigationPageProps) {
   const [actionState, setActionState] =
     useState<"idle" | "approved" | "rejected">("idle")
+
+  const opp = opportunity ?? getPrimaryOpportunity()
+
+  const dynamicMetrics = [
+    { label: "Customers Analyzed", value: "12,840", sub: "Total active base" },
+    { label: "Orders Analyzed", value: "18,420", sub: "Last 90 days" },
+    {
+      label: "Current Attach Rate",
+      value: `${(opp.attachRate * 100).toFixed(0)}%`,
+      sub: `${opp.recommendedProduct.name} with ${opp.sourceProduct.name}`,
+    },
+    {
+      label: "Benchmark Attach Rate",
+      value: `${Math.round(opp.benchmarkAttachRate * 100)}%`,
+      sub: "Category median",
+    },
+    {
+      label: "Expected Attach Rate",
+      value: "31%",
+      sub: "Post-campaign target",
+    },
+    {
+      label: "Expected Additional Orders",
+      value: `~${opp.expectedIncrementalOrders}`,
+      sub: `${opp.recommendedProduct.name} orders unlocked`,
+    },
+  ]
+
+  const reasoningList = [
+    {
+      signal: "Co-purchase pattern",
+      icon: "📊",
+      summary: `Strong basket affinity between ${opp.sourceProduct.name.toLowerCase()} and ${opp.recommendedProduct.name.toLowerCase()}`,
+      detail: `18,420 orders were scanned over 90 days. Customers who bought ${opp.recommendedProduct.name.toLowerCase()} within 14 days of shoe purchase show 2.3× higher lifetime value, 41% lower return rates, and 28% higher repeat-order frequency. The co-purchase signal has a Pearson correlation of 0.74 — well above the 0.5 threshold GrowthOS uses to flag opportunities.`,
+      stat: "r = 0.74 correlation",
+      statVariant: "info" as const,
+    },
+    {
+      signal: "Attach rate gap",
+      icon: "📉",
+      summary: `SoleX attach rate is ${Math.round(opp.gap * 100)}pp below category median`,
+      detail: `SoleX's current ${opp.recommendedProduct.name.toLowerCase()} attach rate of ${(opp.attachRate * 100).toFixed(0)}% sits well below the sportswear category median of ${Math.round(opp.benchmarkAttachRate * 100)}% (sampled across 48 comparable merchants on Razorpay). Merchants who ran targeted cross-sell campaigns to close similar gaps saw attach rates of 28–34% within 60 days. GrowthOS estimates SoleX can realistically reach 31%.`,
+      stat: `${Math.round(opp.gap * 100)}pp gap vs. peers`,
+      statVariant: "warning" as const,
+    },
+    {
+      signal: "High-intent but unconverted",
+      icon: "🔍",
+      summary: `${opp.estimatedEligibleCustomers.toLocaleString()} customers browsed ${opp.recommendedProduct.name.toLowerCase()} but didn't buy`,
+      detail: `Of the eligible customer pool, ${opp.estimatedEligibleCustomers.toLocaleString()} visited the ${opp.recommendedProduct.name.toLowerCase()} category page an average of 2.4 times in the 30 days following their shoe purchase — but did not convert. This indicates latent demand that a timely, well-priced campaign can activate. Email open rates for this segment average 38%, above the SoleX baseline of 27%.`,
+      stat: "2.4 avg page visits",
+      statVariant: "info" as const,
+    },
+    {
+      signal: "Seasonal timing",
+      icon: "📅",
+      summary: "September–October is peak running accessory season",
+      detail:
+        "Historical transaction data from the last 3 years shows a consistent 22% spike in running accessory purchases during September–October. Acting now captures the seasonal window. Delay by 3+ weeks and the effective attach rate uplift drops by an estimated 8pp as the intent window closes.",
+      stat: "+22% seasonal uplift",
+      statVariant: "success" as const,
+    },
+  ]
 
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50 p-6">
@@ -40,7 +103,7 @@ export function OpportunityInvestigationPage({
         </button>
         <span className="text-slate-300">{Icons.chevronRight}</span>
         <span className="text-slate-900 font-medium">
-          Running Shoes → Running Socks
+          {opp.sourceProduct.name} → {opp.recommendedProduct.name}
         </span>
         <span className="ml-2">
           <Badge variant="info">
@@ -57,11 +120,13 @@ export function OpportunityInvestigationPage({
               <Badge variant="info">
                 <span>{Icons.sparkle}</span> AI Identified · Aug 31, 2026
               </Badge>
-              <Badge variant="success">High Confidence · 87%</Badge>
+              <Badge variant="success">
+                High Confidence · {opp.confidenceScore}%
+              </Badge>
               <Badge variant="muted">Cross-sell</Badge>
             </div>
             <h1 className="text-2xl font-semibold text-slate-900 mb-1">
-              Running Shoes → Running Socks
+              {opp.sourceProduct.name} → {opp.recommendedProduct.name}
             </h1>
             <p className="text-sm text-slate-500">
               GrowthOS detected a cross-sell opportunity by analyzing
@@ -73,7 +138,9 @@ export function OpportunityInvestigationPage({
             <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">
               Expected Incremental Revenue
             </p>
-            <p className="text-4xl font-bold text-blue-700 mono">₹42,600</p>
+            <p className="text-4xl font-bold text-blue-700 mono">
+              ₹{opp.estimatedIncrementalRevenue.toLocaleString()}
+            </p>
             <p className="text-xs text-slate-400 mt-1.5">
               Based on 31% target attach rate
             </p>
@@ -82,7 +149,7 @@ export function OpportunityInvestigationPage({
 
         {/* Key metrics grid */}
         <div className="grid grid-cols-6 gap-3 mt-6 pt-5 border-t border-slate-100">
-          {investigationMetrics.map((m) => (
+          {dynamicMetrics.map((m) => (
             <div key={m.label} className="flex flex-col gap-1">
               <p className="text-[10px] text-slate-400 uppercase tracking-wider leading-tight">
                 {m.label}
@@ -104,8 +171,16 @@ export function OpportunityInvestigationPage({
             </h2>
             <div className="flex items-end gap-6 mb-4">
               {[
-                { label: "Current (SoleX)", value: 16, color: "bg-slate-300" },
-                { label: "Category Median", value: 29, color: "bg-amber-400" },
+                {
+                  label: "Current (SoleX)",
+                  value: Math.round(opp.attachRate * 100),
+                  color: "bg-slate-300",
+                },
+                {
+                  label: "Category Median",
+                  value: Math.round(opp.benchmarkAttachRate * 100),
+                  color: "bg-amber-400",
+                },
                 {
                   label: "Target (Post-Campaign)",
                   value: 31,
@@ -135,8 +210,12 @@ export function OpportunityInvestigationPage({
             </div>
             <div className="bg-amber-50 border border-amber-100 rounded-lg px-4 py-3">
               <p className="text-xs text-amber-800 font-medium">
-                Closing the attach rate gap from 16% → 31% unlocks ~427
-                additional sock orders and ₹42,600 in incremental revenue.
+                Closing the attach rate gap from{" "}
+                {Math.round(opp.attachRate * 100)}% → 31% unlocks ~
+                {opp.expectedIncrementalOrders} additional{" "}
+                {opp.recommendedProduct.name.toLowerCase()} orders and ₹
+                {opp.estimatedIncrementalRevenue.toLocaleString()} in
+                incremental revenue.
               </p>
             </div>
           </div>
@@ -159,13 +238,17 @@ export function OpportunityInvestigationPage({
                 <span className="font-semibold text-slate-900">
                   18,420 orders
                 </span>{" "}
-                over the last 90 days. Customers who purchased running shoes
-                frequently purchased running socks within 14 days. Your current
-                attach rate is{" "}
-                <span className="font-semibold text-slate-900">16%</span>,
-                compared with a{" "}
+                over the last 90 days. Customers who purchased{" "}
+                {opp.sourceProduct.name.toLowerCase()} frequently purchased{" "}
+                {opp.recommendedProduct.name.toLowerCase()} within 14 days. Your
+                current attach rate is{" "}
                 <span className="font-semibold text-slate-900">
-                  29% category benchmark
+                  {Math.round(opp.attachRate * 100)}%
+                </span>
+                , compared with a{" "}
+                <span className="font-semibold text-slate-900">
+                  {Math.round(opp.benchmarkAttachRate * 100)}% category
+                  benchmark
                 </span>
                 . This indicates a strong cross-sell opportunity.
               </p>
@@ -197,8 +280,8 @@ export function OpportunityInvestigationPage({
                 },
                 {
                   signal: "Category benchmark",
-                  value: "13pp gap",
-                  note: "SoleX 16% vs. median 29%",
+                  value: `${Math.round(opp.gap * 100)}pp gap`,
+                  note: `SoleX ${Math.round(opp.attachRate * 100)}% vs. median ${Math.round(opp.benchmarkAttachRate * 100)}%`,
                   variant: "warning" as const,
                 },
               ].map((e) => (
@@ -219,7 +302,7 @@ export function OpportunityInvestigationPage({
 
             {/* Detailed reasoning panels */}
             <div className="flex flex-col gap-3">
-              {investigationReasoning.map((r, i) => (
+              {reasoningList.map((r, i) => (
                 <div
                   key={i}
                   className="border border-slate-100 rounded-xl overflow-hidden"
@@ -320,13 +403,13 @@ export function OpportunityInvestigationPage({
                     fill="none"
                     stroke="#2563EB"
                     strokeWidth="10"
-                    strokeDasharray={`${87 * 2.51} ${100 * 2.51 - 87 * 2.51}`}
+                    strokeDasharray={`${opp.confidenceScore * 2.51} ${100 * 2.51 - opp.confidenceScore * 2.51}`}
                     strokeLinecap="round"
                   />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
                   <span className="text-2xl font-bold text-slate-900 mono">
-                    87%
+                    {opp.confidenceScore}%
                   </span>
                   <span className="text-[10px] text-slate-400">confidence</span>
                 </div>
@@ -384,15 +467,19 @@ export function OpportunityInvestigationPage({
                   </div>
                   <div className="divide-y divide-slate-100">
                     <div className="flex justify-between items-center px-4 py-2.5 text-sm">
-                      <span className="text-slate-600">Running Shoes</span>
+                      <span className="text-slate-600">
+                        {opp.sourceProduct.name}
+                      </span>
                       <span className="text-slate-700 mono font-medium">
-                        ₹2,499
+                        ₹{opp.sourceProduct.price.toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between items-center px-4 py-2.5 text-sm">
-                      <span className="text-slate-600">Running Socks</span>
+                      <span className="text-slate-600">
+                        {opp.recommendedProduct.name}
+                      </span>
                       <span className="text-slate-700 mono font-medium">
-                        ₹499
+                        ₹{opp.recommendedProduct.price.toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between items-center px-4 py-3 bg-blue-50">
@@ -400,7 +487,11 @@ export function OpportunityInvestigationPage({
                         Bundle Price
                       </span>
                       <span className="text-base font-bold text-blue-700 mono">
-                        ₹2,799
+                        ₹
+                        {(
+                          opp.sourceProduct.price +
+                          Math.round(opp.recommendedProduct.price * 0.6)
+                        ).toLocaleString()}
                       </span>
                     </div>
                   </div>
@@ -410,7 +501,9 @@ export function OpportunityInvestigationPage({
                   <span className="text-emerald-700 font-medium">
                     Expected AOV increase
                   </span>
-                  <span className="font-bold text-emerald-700 mono">+₹300</span>
+                  <span className="font-bold text-emerald-700 mono">
+                    +₹{Math.round(opp.recommendedProduct.price * 0.6)}
+                  </span>
                 </div>
 
                 {/* Projected outcome — labelled as expected, not actual */}
@@ -420,11 +513,17 @@ export function OpportunityInvestigationPage({
                   </p>
                   <div className="flex flex-col gap-0 text-xs">
                     {[
-                      { label: "Customers targeted", value: "2,840" },
-                      { label: "Expected purchases", value: "~427" },
+                      {
+                        label: "Customers targeted",
+                        value: opp.estimatedEligibleCustomers.toLocaleString(),
+                      },
+                      {
+                        label: "Expected purchases",
+                        value: `~${opp.expectedIncrementalOrders}`,
+                      },
                       {
                         label: "Expected incremental revenue",
-                        value: "₹42,600",
+                        value: `₹${opp.estimatedIncrementalRevenue.toLocaleString()}`,
                       },
                       { label: "Channel", value: "Email + WhatsApp" },
                     ].map((r) => (
@@ -520,8 +619,11 @@ export function OpportunityInvestigationPage({
 
 export function OpportunityDetailPage({
   onNav,
+  opportunity,
 }: OpportunityInvestigationPageProps) {
-  return <OpportunityInvestigationPage onNav={onNav} />
+  return (
+    <OpportunityInvestigationPage onNav={onNav} opportunity={opportunity} />
+  )
 }
 
 export default OpportunityInvestigationPage

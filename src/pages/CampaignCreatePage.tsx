@@ -1,15 +1,23 @@
 import { useState } from "react"
 import type { Page } from "../types"
+import type { CrossSellOpportunity } from "../types/dataFoundation"
+import { getPrimaryOpportunity } from "../services/opportunityService"
 import { Icons } from "../components/common/Icons"
 
 export interface CampaignCreatePageProps {
   onNav: (p: Page) => void
+  opportunity?: CrossSellOpportunity
 }
 
-export function CampaignCreatePage({ onNav }: CampaignCreatePageProps) {
+export function CampaignCreatePage({
+  onNav,
+  opportunity,
+}: CampaignCreatePageProps) {
   const [step, setStep] = useState(1)
   const [channel, setChannel] = useState("email")
   const [launched, setLaunched] = useState(false)
+
+  const opp = opportunity ?? getPrimaryOpportunity()
 
   if (launched) {
     return (
@@ -30,8 +38,9 @@ export function CampaignCreatePage({ onNav }: CampaignCreatePageProps) {
             Campaign Launched!
           </h2>
           <p className="text-sm text-slate-500 mb-6">
-            "Complete Your Run" is now live. 2,840 customers will receive the
-            campaign over the next 24 hours.
+            "Complete Your Run" is now live.{" "}
+            {opp.estimatedEligibleCustomers.toLocaleString()} customers will
+            receive the campaign over the next 24 hours.
           </p>
           <div className="flex gap-3">
             <button
@@ -187,15 +196,22 @@ export function CampaignCreatePage({ onNav }: CampaignCreatePageProps) {
                 </span>
               </div>
               <p className="text-xs text-blue-700">
-                Customers who purchased running shoes in the last 45 days
-                without purchasing running socks, with prior sock category
-                interest.
+                Customers who purchased {opp.sourceProduct.name.toLowerCase()}{" "}
+                in the last 45 days without purchasing{" "}
+                {opp.recommendedProduct.name.toLowerCase()}, with prior sock
+                category interest.
               </p>
             </div>
             <div className="grid grid-cols-3 gap-4 mb-5">
               {[
-                { label: "Total Customers", value: "2,840" },
-                { label: "Avg. Order Value", value: "₹2,840" },
+                {
+                  label: "Total Customers",
+                  value: opp.estimatedEligibleCustomers.toLocaleString(),
+                },
+                {
+                  label: "Avg. Order Value",
+                  value: `₹${Math.round(opp.averageOrderValue).toLocaleString()}`,
+                },
                 { label: "Email Deliverability", value: "94.2%" },
               ].map((m) => (
                 <div
@@ -299,11 +315,20 @@ export function CampaignCreatePage({ onNav }: CampaignCreatePageProps) {
               {[
                 { label: "Campaign", value: '"Complete Your Run"' },
                 { label: "Type", value: "Cross-sell Bundle" },
-                { label: "Bundle Price", value: "₹2,799" },
+                {
+                  label: "Bundle Price",
+                  value: `₹${(opp.sourceProduct.price + Math.round(opp.recommendedProduct.price * 0.6)).toLocaleString()}`,
+                },
                 { label: "Channel", value: "Email + WhatsApp" },
-                { label: "Audience Size", value: "2,840 customers" },
-                { label: "Expected Incremental Revenue", value: "₹42,600" },
-                { label: "AI Confidence", value: "87%" },
+                {
+                  label: "Audience Size",
+                  value: `${opp.estimatedEligibleCustomers.toLocaleString()} customers`,
+                },
+                {
+                  label: "Expected Incremental Revenue",
+                  value: `₹${opp.estimatedIncrementalRevenue.toLocaleString()}`,
+                },
+                { label: "AI Confidence", value: `${opp.confidenceScore}%` },
               ].map((r, i, arr) => (
                 <div
                   key={r.label}

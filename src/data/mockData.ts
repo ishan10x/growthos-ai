@@ -104,7 +104,7 @@ export const investigationMetrics: InvestigationMetric[] = [
   { label: "Expected Attach Rate", value: "31%", sub: "Post-campaign target" },
   {
     label: "Expected Additional Orders",
-    value: "~427",
+    value: "~417",
     sub: "Sock orders unlocked",
   },
 ]
@@ -131,9 +131,9 @@ export const investigationReasoning: InvestigationReasoning[] = [
   {
     signal: "High-intent but unconverted",
     icon: "🔍",
-    summary: "2,840 customers browsed socks but didn't buy",
+    summary: "2,772 customers browsed socks but didn't buy",
     detail:
-      "Of the eligible customer pool, 2,840 visited the running socks category page an average of 2.4 times in the 30 days following their shoe purchase — but did not convert. This indicates latent demand that a timely, well-priced campaign can activate. Email open rates for this segment average 38%, above the SoleX baseline of 27%.",
+      "Of the eligible customer pool, 2,772 visited the running socks category page an average of 2.4 times in the 30 days following their shoe purchase — but did not convert. This indicates latent demand that a timely, well-priced campaign can activate. Email open rates for this segment average 38%, above the SoleX baseline of 27%.",
     stat: "2.4 avg page visits",
     statVariant: "info",
   },
@@ -262,7 +262,7 @@ export const aiActivityLogs: AIActivityLog[] = [
     type: "opportunity",
     title: "Opportunity Discovered",
     detail: "Running Shoes → Running Socks cross-sell opportunity identified",
-    meta: "18,420 orders analyzed · 2,840 customers eligible · Confidence: 87%",
+    meta: "18,420 orders analyzed · 2,772 customers eligible · Confidence: 89%",
     status: "completed",
   },
   {
@@ -270,7 +270,7 @@ export const aiActivityLogs: AIActivityLog[] = [
     title: "Customer Segment Analyzed",
     type: "analysis",
     detail:
-      "Segmented 2,840 customers based on purchase recency, sock page visits, and email engagement",
+      "Segmented 2,772 customers based on purchase recency, sock page visits, and email engagement",
     meta: "Model: Segment Clustering v2.1 · Runtime: 1.4s",
     status: "completed",
   },

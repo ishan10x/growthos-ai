@@ -8,6 +8,7 @@ import {
   ResponsiveContainer,
 } from "recharts"
 import type { Page } from "../types"
+import type { CrossSellOpportunity } from "../types/dataFoundation"
 import { Icons } from "../components/common/Icons"
 import { Badge } from "../components/common/Badge"
 import { StatCard } from "../components/common/StatCard"
@@ -16,25 +17,48 @@ import { ConfidenceMeter } from "../components/common/ConfidenceMeter"
 import { AICommandBar } from "../components/layout/AICommandBar"
 import { revenueData, customerSegmentData } from "../data/mockData"
 import { formatRevenue } from "../utils/formatters"
+import {
+  getCalculatedOpportunities,
+  getPrimaryOpportunity,
+} from "../services/opportunityService"
 
 export interface DashboardPageProps {
   onNav: (p: Page) => void
+  onSelectOpportunity?: (opp: CrossSellOpportunity) => void
 }
 
-export function DashboardPage({ onNav }: DashboardPageProps) {
+export function DashboardPage({
+  onNav,
+  onSelectOpportunity,
+}: DashboardPageProps) {
+  const opportunities = getCalculatedOpportunities()
+  const primaryOpp = getPrimaryOpportunity()
+  const secondaryOpps = opportunities.filter(
+    (o) =>
+      !(
+        o.sourceProduct.id === primaryOpp.sourceProduct.id &&
+        o.recommendedProduct.id === primaryOpp.recommendedProduct.id
+      ),
+  )
+
+  const totalCalculatedRevenue = opportunities.reduce(
+    (sum, o) => sum + o.estimatedIncrementalRevenue,
+    0,
+  )
+
   const aiActivities = [
     {
       time: "2m ago",
       icon: Icons.sparkle,
       text: "New cross-sell opportunity identified",
-      label: "Running Shoes → Socks",
+      label: `${primaryOpp.sourceProduct.name} → ${primaryOpp.recommendedProduct.name}`,
       status: "new",
     },
     {
       time: "15m ago",
       icon: Icons.info,
       text: "Customer segment analyzed",
-      label: "2,840 eligible customers",
+      label: `${primaryOpp.estimatedEligibleCustomers.toLocaleString()} eligible customers`,
       status: "info",
     },
     {
@@ -52,6 +76,16 @@ export function DashboardPage({ onNav }: DashboardPageProps) {
       status: "warning",
     },
   ]
+
+  const handleInvestigate = (opp: CrossSellOpportunity) => {
+    onSelectOpportunity?.(opp)
+    onNav("opportunity-investigate")
+  }
+
+  const handleLaunch = (opp: CrossSellOpportunity) => {
+    onSelectOpportunity?.(opp)
+    onNav("campaign-create")
+  }
 
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50 p-6">
@@ -96,9 +130,11 @@ export function DashboardPage({ onNav }: DashboardPageProps) {
             </p>
             <span className="text-blue-300">{Icons.sparkle}</span>
           </div>
-          <p className="text-2xl font-semibold text-white mono">₹2.84L</p>
+          <p className="text-2xl font-semibold text-white mono">
+            ₹{(totalCalculatedRevenue / 100000).toFixed(2)}L
+          </p>
           <p className="text-xs text-blue-200">
-            Across 5 identified opportunities
+            Across {opportunities.length} identified opportunities
           </p>
         </div>
       </div>
@@ -235,7 +271,7 @@ export function DashboardPage({ onNav }: DashboardPageProps) {
             subtitle="Revenue opportunities identified by AI"
             action={
               <Badge variant="info">
-                <span>{Icons.sparkle}</span> 3 active
+                <span>{Icons.sparkle}</span> {opportunities.length} active
               </Badge>
             }
           />
@@ -250,14 +286,17 @@ export function DashboardPage({ onNav }: DashboardPageProps) {
                   <Badge variant="success">High Confidence</Badge>
                 </div>
                 <h3 className="text-base font-semibold text-slate-900 mt-2">
-                  Running Shoes → Running Socks
+                  {primaryOpp.sourceProduct.name} →{" "}
+                  {primaryOpp.recommendedProduct.name}
                 </h3>
                 <p className="text-sm text-slate-500 mt-0.5">
                   Cross-sell opportunity based on purchase pattern analysis
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-2xl font-bold text-blue-700 mono">₹42,600</p>
+                <p className="text-2xl font-bold text-blue-700 mono">
+                  ₹{primaryOpp.estimatedIncrementalRevenue.toLocaleString()}
+                </p>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Expected incremental revenue
                 </p>
@@ -266,10 +305,22 @@ export function DashboardPage({ onNav }: DashboardPageProps) {
 
             <div className="grid grid-cols-4 gap-4 mb-4">
               {[
-                { label: "Potential Customers", value: "2,840" },
-                { label: "Current Attach Rate", value: "16%" },
-                { label: "Target Attach Rate", value: "31%" },
-                { label: "AI Confidence", value: "87%" },
+                {
+                  label: "Potential Customers",
+                  value: primaryOpp.estimatedEligibleCustomers.toLocaleString(),
+                },
+                {
+                  label: "Current Attach Rate",
+                  value: `${(primaryOpp.attachRate * 100).toFixed(0)}%`,
+                },
+                {
+                  label: "Target Attach Rate",
+                  value: "31%",
+                },
+                {
+                  label: "AI Confidence",
+                  value: `${primaryOpp.confidenceScore}%`,
+                },
               ].map((m) => (
                 <div
                   key={m.label}
@@ -288,20 +339,22 @@ export function DashboardPage({ onNav }: DashboardPageProps) {
             <div className="mb-4">
               <div className="flex justify-between text-xs text-slate-500 mb-1.5">
                 <span>AI Confidence Score</span>
-                <span className="font-medium text-slate-700">87%</span>
+                <span className="font-medium text-slate-700">
+                  {primaryOpp.confidenceScore}%
+                </span>
               </div>
-              <ConfidenceMeter value={87} />
+              <ConfidenceMeter value={primaryOpp.confidenceScore} />
             </div>
 
             <div className="flex gap-2.5">
               <button
-                onClick={() => onNav("opportunity-investigate")}
+                onClick={() => handleInvestigate(primaryOpp)}
                 className="flex-1 px-4 py-2.5 border border-slate-200 bg-white text-sm font-medium text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
               >
                 Investigate
               </button>
               <button
-                onClick={() => onNav("campaign-create")}
+                onClick={() => handleLaunch(primaryOpp)}
                 className="flex-1 px-4 py-2.5 bg-blue-600 text-sm font-semibold text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 Launch Campaign
@@ -311,36 +364,24 @@ export function DashboardPage({ onNav }: DashboardPageProps) {
 
           {/* Other opportunities */}
           <div className="grid grid-cols-2 gap-3">
-            {[
-              {
-                title: "Premium Insoles Upsell",
-                revenue: "₹28,400",
-                confidence: 79,
-                customers: 1240,
-              },
-              {
-                title: "Hydration Pack Cross-sell",
-                revenue: "₹18,700",
-                confidence: 71,
-                customers: 890,
-              },
-            ].map((o) => (
+            {secondaryOpps.map((o) => (
               <div
-                key={o.title}
+                key={`${o.sourceProduct.id}:${o.recommendedProduct.id}`}
+                onClick={() => handleInvestigate(o)}
                 className="border border-slate-200 rounded-lg p-3.5 hover:border-blue-200 hover:bg-blue-50/20 transition-colors cursor-pointer"
               >
                 <p className="text-sm font-medium text-slate-800 mb-2">
-                  {o.title}
+                  {o.sourceProduct.name} → {o.recommendedProduct.name}
                 </p>
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-xs text-slate-500">
-                    {o.customers.toLocaleString()} customers
+                    {o.estimatedEligibleCustomers.toLocaleString()} customers
                   </span>
                   <span className="text-sm font-semibold text-blue-700 mono">
-                    {o.revenue}
+                    ₹{o.estimatedIncrementalRevenue.toLocaleString()}
                   </span>
                 </div>
-                <ConfidenceMeter value={o.confidence} />
+                <ConfidenceMeter value={o.confidenceScore} />
               </div>
             ))}
           </div>

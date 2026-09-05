@@ -1,5 +1,7 @@
 import { useState } from "react"
 import type { Page } from "./types"
+import type { CrossSellOpportunity } from "./types/dataFoundation"
+import { getPrimaryOpportunity } from "./services/opportunityService"
 import Sidebar from "./components/layout/Sidebar"
 import TopBar from "./components/layout/TopBar"
 import DashboardPage from "./pages/DashboardPage"
@@ -17,6 +19,8 @@ import SettingsPage from "./pages/SettingsPage"
 
 export default function App() {
   const [page, setPage] = useState<Page>("dashboard")
+  const [selectedOpportunity, setSelectedOpportunity] =
+    useState<CrossSellOpportunity>(getPrimaryOpportunity())
 
   const navigate = (p: Page) => setPage(p)
 
@@ -25,15 +29,36 @@ export default function App() {
       <Sidebar current={page} onNav={navigate} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <TopBar onNav={navigate} />
-        {page === "dashboard" && <DashboardPage onNav={navigate} />}
-        {page === "opportunities" && <OpportunitiesPage onNav={navigate} />}
+        {page === "dashboard" && (
+          <DashboardPage
+            onNav={navigate}
+            onSelectOpportunity={setSelectedOpportunity}
+          />
+        )}
+        {page === "opportunities" && (
+          <OpportunitiesPage
+            onNav={navigate}
+            onSelectOpportunity={setSelectedOpportunity}
+          />
+        )}
         {page === "opportunity-detail" && (
-          <OpportunityDetailPage onNav={navigate} />
+          <OpportunityDetailPage
+            onNav={navigate}
+            opportunity={selectedOpportunity}
+          />
         )}
         {page === "opportunity-investigate" && (
-          <OpportunityInvestigationPage onNav={navigate} />
+          <OpportunityInvestigationPage
+            onNav={navigate}
+            opportunity={selectedOpportunity}
+          />
         )}
-        {page === "campaign-create" && <CampaignCreatePage onNav={navigate} />}
+        {page === "campaign-create" && (
+          <CampaignCreatePage
+            onNav={navigate}
+            opportunity={selectedOpportunity}
+          />
+        )}
         {page === "campaign-results" && (
           <CampaignResultsPage onNav={navigate} />
         )}
